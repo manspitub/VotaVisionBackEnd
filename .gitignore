@@ -1,0 +1,35 @@
+# Ignorar archivos de sistema de macOS
+.DS_Store
+
+# Ignorar archivos generados por Maven y Gradle
+mvnw
+mvnw.cmd
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Ignorar archivos de IntelliJ IDEA y Eclipse
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# Ignorar logs y archivos temporales
+logs/
+*.log
+target/
+tmp/
+
+# Ignorar configuraciones de entorno
+.env
+
+# Ignorar dependencias descargadas
+**/node_modules/
+
+# Ignorar archivos de Docker si se usa
+.dockerignore
+docker-compose.override.yml
+

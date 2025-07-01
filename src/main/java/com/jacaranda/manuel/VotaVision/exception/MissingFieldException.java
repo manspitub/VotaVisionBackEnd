@@ -1,0 +1,7 @@
+package com.jacaranda.manuel.VotaVision.exception;
+
+public class MissingFieldException extends RuntimeException {
+	public MissingFieldException(String message) {
+		super(message);
+	}
+}
