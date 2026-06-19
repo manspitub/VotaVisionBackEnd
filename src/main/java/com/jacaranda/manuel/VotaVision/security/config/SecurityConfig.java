@@ -1,6 +1,7 @@
 package com.jacaranda.manuel.VotaVision.security.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -33,6 +34,8 @@ public class SecurityConfig {
     private JwtAuthorizationFilter filter;
     @Autowired
     private JwtAccessDeniedHandler accessDeniedHandler;
+    @Value("${cors.allowed-origins}")
+    private String[] allowedOrigins;
 
     @Bean
     UserService userDetailsService() {
@@ -71,7 +74,7 @@ public class SecurityConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                    .allowedOrigins("http://localhost:4200") // MODO DESAROLLO
+                    .allowedOrigins(allowedOrigins)
                     .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                     .allowedHeaders("*")
                     .allowCredentials(true); // Si necesitas enviar cookies y encabezados de autenticación

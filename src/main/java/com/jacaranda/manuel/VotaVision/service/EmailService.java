@@ -4,6 +4,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -17,12 +18,15 @@ public class EmailService {
 	@Autowired
 	private JavaMailSender mailSender;
 
+	@Value("${app.frontend-base-url}")
+	private String frontendBaseUrl;
+
 	public void sendConfirmationEmail(String to, String name, String surname, String token, boolean isAdmin,
 			String rawPassword) throws MessagingException {
 		String subject = isAdmin ? "🛠 Has sido registrado como Creador en Votavision"
 				: "🔥 ¡Activa tu cuenta ahora y únete a nuestra comunidad!";
 
-		String confirmationUrl = "http://localhost:4200/verify-email?token=" + token;
+		String confirmationUrl = buildFrontendUrl("/verify-email?token=" + urlEncode(token));
 
 		StringBuilder content = new StringBuilder();
 		content.append("<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; ")
@@ -61,7 +65,7 @@ public class EmailService {
 
 	public void sendPasswordRecoveryEmail(String to, String token) throws MessagingException {
 		String subject = "🔑 Recuperación de contraseña - Acción requerida";
-		String recoveryUrl = "http://localhost:4200/forgot-password?token=" + token; // Token generado
+		String recoveryUrl = buildFrontendUrl("/forgot-password?token=" + urlEncode(token)); // Token generado
 
 		// Contenido del correo con HTML mejorado
 		String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; "
@@ -143,7 +147,7 @@ public class EmailService {
 
     // Codificar el título para usarlo en el enlace
     
-    String reviewLink = "http://localhost:4200/surveys/moderate/"+ surveyTitle;
+    String reviewLink = buildFrontendUrl("/surveys/moderate/" + urlEncode(surveyTitle));
 
     String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; "
             + "border: 1px solid #ddd; border-radius: 10px; background-color: #fff3cd;'>"
@@ -166,6 +170,16 @@ public class EmailService {
 
     mailSender.send(message);
 }
+
+	private String buildFrontendUrl(String path) {
+		String baseUrl = frontendBaseUrl.endsWith("/") ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
+				: frontendBaseUrl;
+		return baseUrl + path;
+	}
+
+	private String urlEncode(String value) {
+		return URLEncoder.encode(value, StandardCharsets.UTF_8);
+	}
 
 	
 

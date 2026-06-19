@@ -61,7 +61,26 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
-Asegúrate de configurar el archivo `application.properties` con los datos correctos de tu PostgreSQL.
+Asegúrate de configurar variables de entorno para la base de datos, correo y JWT. Puedes usar `.env.example` como plantilla.
+
+---
+
+## 🚀 Despliegue en Render
+
+Esta rama incluye `Dockerfile` y `render.yaml` para desplegar el backend como Web Service Docker en Render.
+
+Variables obligatorias en Render:
+
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `SPRING_MAIL_USERNAME`
+- `SPRING_MAIL_PASSWORD`
+- `JWT_SECRET`
+- `FRONTEND_BASE_URL`
+- `CORS_ALLOWED_ORIGINS`
+
+Render generará `JWT_SECRET` si creas el servicio desde el Blueprint. El resto deben configurarse en el dashboard sin subir valores reales al repositorio.
 
 ---
 

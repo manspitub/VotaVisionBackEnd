@@ -6,6 +6,7 @@ mvnw
 mvnw.cmd
 .gradle/
 build/
+bin/
 !gradle/wrapper/gradle-wrapper.jar
 
 # Ignorar archivos de IntelliJ IDEA y Eclipse
@@ -25,11 +26,11 @@ tmp/
 
 # Ignorar configuraciones de entorno
 .env
+.env.*
+!.env.example
+src/main/resources/application-local.properties
 
 # Ignorar dependencias descargadas
 **/node_modules/
 
-# Ignorar archivos de Docker si se usa
-.dockerignore
 docker-compose.override.yml
-

@@ -30,7 +30,7 @@ public class JwtProvider {
 	public static final String TOKEN_HEADER = "Authorization";
 	public static final String TOKEN_PREFIX = "Bearer ";
 
-	@Value("${jwt.secret:V79GUHScIFb2AE7jZogWMOwYnJIrvTIWyDhlA91iHhDKcZeLzeU5ULDGUdRFLH3EJ9v7mvW8DMChl_eg9Wh5-IfEvHM7Os6lXfrNcX4Ln4Seiym_djlZzi1ZDCvalxyCKIJZUsHJvlF6zC-YcMsjrbvWi9kYfkllmFdn9DpyezY}")
+	@Value("${jwt.secret}")
 	private String jwtSecret;
 
 	@Value("${jwt.duration:3600}") // 1 hora (3600 seconds)
