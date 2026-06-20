@@ -48,6 +48,9 @@ public class EmailService {
 		brevoApiKey = brevoApiKey.trim();
 		senderName = senderName.trim();
 		senderEmail = senderEmail.trim();
+		log.info("Brevo configurado. senderEmail={}, apiKeyLength={}, apiKeyPrefix={}",
+				senderEmail, brevoApiKey.length(),
+				brevoApiKey.length() >= 8 ? brevoApiKey.substring(0, 8) : "too-short");
 
 		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
 		Duration timeout = Duration.ofMillis(brevoTimeoutMs);
@@ -193,8 +196,8 @@ public class EmailService {
 		} catch (RestClientResponseException e) {
 			log.error("Brevo rechazó el correo. status={}, body={}, to={}, sender={}",
 					e.getStatusCode(), e.getResponseBodyAsString(), to, senderEmail, e);
-			throw new MailSendException("No se pudo enviar el correo con Brevo. Respuesta: "
-					+ e.getResponseBodyAsString(), e);
+			throw new MailSendException("No se pudo enviar el correo con Brevo. Status: " + e.getStatusCode()
+					+ ". Respuesta: " + e.getResponseBodyAsString(), e);
 		} catch (RestClientException e) {
 			log.error("Error conectando con Brevo. to={}, sender={}", to, senderEmail, e);
 			throw new MailSendException("No se pudo enviar el correo con Brevo", e);
