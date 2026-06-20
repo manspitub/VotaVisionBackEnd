@@ -131,7 +131,7 @@ public class GlobalControllerError {
 	
 	@ExceptionHandler(MailAuthenticationException.class)
 	public ResponseEntity<ApiError> handleMailAuthenticationException(MailAuthenticationException e) {
-		log.error("Error de autenticación SMTP", e);
+		log.error("Error de autenticación con el proveedor de correo", e);
 		ApiError apiError = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now(),
 				"No se pudo autenticar con el servidor de correo. Contacta con el administrador.");
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(apiError);
@@ -139,7 +139,7 @@ public class GlobalControllerError {
 
 	@ExceptionHandler(MailSendException.class)
 	public ResponseEntity<ApiError> handleMailSendException(MailSendException e) {
-		log.error("Error enviando correo SMTP", e);
+		log.error("Error enviando correo", e);
 		ApiError apiError = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now(),
 				"No se pudo enviar el correo. Inténtalo más tarde.");
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(apiError);
