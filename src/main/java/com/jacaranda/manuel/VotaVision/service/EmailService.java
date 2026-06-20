@@ -45,6 +45,10 @@ public class EmailService {
 
 	@PostConstruct
 	private void init() {
+		brevoApiKey = brevoApiKey.trim();
+		senderName = senderName.trim();
+		senderEmail = senderEmail.trim();
+
 		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
 		Duration timeout = Duration.ofMillis(brevoTimeoutMs);
 		requestFactory.setConnectTimeout(timeout);
