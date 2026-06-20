@@ -1,59 +1,31 @@
 package com.jacaranda.manuel.VotaVision.service;
 
 import java.net.URLEncoder;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 import java.nio.charset.StandardCharsets;
 
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.mail.MailSendException;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
-import jakarta.annotation.PostConstruct;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
 
+	@Autowired
+	private JavaMailSender mailSender;
+
 	@Value("${app.frontend-base-url}")
 	private String frontendBaseUrl;
 
-	@Value("${resend.api-key}")
-	private String resendApiKey;
-
-	@Value("${resend.from}")
-	private String resendFrom;
-
-	@Value("${resend.reply-to:}")
-	private String resendReplyTo;
-
-	@Value("${resend.timeout-ms:10000}")
-	private int resendTimeoutMs;
-
-	private RestClient resendClient;
-
-	@PostConstruct
-	private void init() {
-		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-		Duration timeout = Duration.ofMillis(resendTimeoutMs);
-		requestFactory.setConnectTimeout(timeout);
-		requestFactory.setReadTimeout(timeout);
-
-		this.resendClient = RestClient.builder()
-				.baseUrl("https://api.resend.com")
-				.requestFactory(requestFactory)
-				.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + resendApiKey)
-				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-				.build();
-	}
+	@Value("${spring.mail.username}")
+	private String mailFrom;
 
 	public void sendConfirmationEmail(String to, String name, String surname, String token, boolean isAdmin,
-			String rawPassword) {
+			String rawPassword) throws MessagingException {
 		String subject = isAdmin ? "🛠 Has sido registrado como Creador en Votavision"
 				: "🔥 ¡Activa tu cuenta ahora y únete a nuestra comunidad!";
 
@@ -84,10 +56,18 @@ public class EmailService {
 				.append("<p style='font-size: 14px; color: #999;'>Saludos,<br><strong>El equipo de Soporte</strong></p>")
 				.append("</div>");
 
-		sendEmail(to, subject, content.toString());
+		MimeMessage message = mailSender.createMimeMessage();
+		MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+		helper.setFrom(mailFrom);
+		helper.setTo(to);
+		helper.setSubject(subject);
+		helper.setText(content.toString(), true); // true para HTML
+
+		mailSender.send(message);
 	}
 
-	public void sendPasswordRecoveryEmail(String to, String token) {
+	public void sendPasswordRecoveryEmail(String to, String token) throws MessagingException {
 		String subject = "🔑 Recuperación de contraseña - Acción requerida";
 		String recoveryUrl = buildFrontendUrl("/forgot-password?token=" + urlEncode(token)); // Token generado
 
@@ -104,10 +84,19 @@ public class EmailService {
 				+ "<p style='font-size: 14px; color: #999;'>Saludos,<br><strong>El equipo de Soporte</strong></p>"
 				+ "</div>";
 
-		sendEmail(to, subject, content);
+		// Configurar el correo electrónico
+		MimeMessage message = mailSender.createMimeMessage();
+		MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+		helper.setFrom(mailFrom);
+		helper.setTo(to);
+		helper.setSubject(subject);
+		helper.setText(content, true); // `true` para contenido HTML
+
+		mailSender.send(message);
 	}
 
-	public void sendUserDeletionEmail(String to, String name, String surname) {
+	public void sendUserDeletionEmail(String to, String name, String surname) throws MessagingException {
 		String subject = "🗑 Cuenta eliminada - VotaVision";
 
 		String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; "
@@ -120,10 +109,18 @@ public class EmailService {
 				+ "<p style='font-size: 14px; color: #999;'>Saludos,<br><strong>El equipo de Soporte de VotaVision</strong></p>"
 				+ "</div>";
 
-		sendEmail(to, subject, content);
+		MimeMessage message = mailSender.createMimeMessage();
+		MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+		helper.setFrom(mailFrom);
+		helper.setTo(to);
+		helper.setSubject(subject);
+		helper.setText(content, true); // HTML habilitado
+
+		mailSender.send(message);
 	}
 	
-	public void sendSurveyDeletionByAdminEmail(String to, String creatorName, String creatorSurname, String surveyTitle, String reason, String adminName, String adminEmail) {
+	public void sendSurveyDeletionByAdminEmail(String to, String creatorName, String creatorSurname, String surveyTitle, String reason, String adminName, String adminEmail) throws MessagingException {
 	    String subject = "🗑 Encuesta eliminada por moderación - VotaVision";
 
 	    String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; "
@@ -139,11 +136,19 @@ public class EmailService {
 	            + "<p style='font-size: 14px; color: #999;'>Saludos,<br><strong>El equipo de Soporte de VotaVision</strong></p>"
 	            + "</div>";
 
-	    sendEmail(to, subject, content);
+	    MimeMessage message = mailSender.createMimeMessage();
+	    MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+	    helper.setFrom(mailFrom);
+	    helper.setTo(to);
+	    helper.setSubject(subject);
+	    helper.setText(content, true);
+
+	    mailSender.send(message);
 	}
 	
 	
-	public void sendSurveyReportAlertToAdmins(String adminEmail, String reporterName, String reporterEmail, String surveyTitle, String reason) {
+	public void sendSurveyReportAlertToAdmins(String adminEmail, String reporterName, String reporterEmail, String surveyTitle, String reason) throws MessagingException {
 
     String subject = "🚩 Encuesta reportada por un usuario - Revisión requerida";
 
@@ -163,30 +168,16 @@ public class EmailService {
             + "<p style='font-size: 14px; color: #999;'>Este mensaje ha sido generado automáticamente por el sistema VotaVision.</p>"
             + "</div>";
 
-    sendEmail(adminEmail, subject, content);
+    MimeMessage message = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+    helper.setFrom(mailFrom);
+    helper.setTo(adminEmail); // O lista dinámica de admins
+    helper.setSubject(subject);
+    helper.setText(content, true);
+
+    mailSender.send(message);
 }
-
-	private void sendEmail(String to, String subject, String html) {
-		Map<String, Object> payload = new HashMap<>();
-		payload.put("from", resendFrom);
-		payload.put("to", to);
-		payload.put("subject", subject);
-		payload.put("html", html);
-
-		if (resendReplyTo != null && !resendReplyTo.isBlank()) {
-			payload.put("reply_to", resendReplyTo);
-		}
-
-		try {
-			resendClient.post()
-					.uri("/emails")
-					.body(payload)
-					.retrieve()
-					.toBodilessEntity();
-		} catch (RestClientException e) {
-			throw new MailSendException("No se pudo enviar el correo con Resend", e);
-		}
-	}
 
 	private String buildFrontendUrl(String path) {
 		String baseUrl = frontendBaseUrl.endsWith("/") ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1)
