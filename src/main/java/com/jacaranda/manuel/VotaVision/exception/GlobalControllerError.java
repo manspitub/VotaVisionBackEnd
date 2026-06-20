@@ -3,6 +3,8 @@ package com.jacaranda.manuel.VotaVision.exception;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,8 @@ import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
 public class GlobalControllerError {
+
+	private static final Logger log = LoggerFactory.getLogger(GlobalControllerError.class);
 
 	@ExceptionHandler(value = InvalidPasswordException.class)
 	public ResponseEntity<ApiError> handleInvalidPasswordException(InvalidPasswordException e) {
@@ -127,6 +131,7 @@ public class GlobalControllerError {
 	
 	@ExceptionHandler(MailAuthenticationException.class)
 	public ResponseEntity<ApiError> handleMailAuthenticationException(MailAuthenticationException e) {
+		log.error("Error de autenticación SMTP", e);
 		ApiError apiError = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now(),
 				"No se pudo autenticar con el servidor de correo. Contacta con el administrador.");
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(apiError);
@@ -134,6 +139,7 @@ public class GlobalControllerError {
 
 	@ExceptionHandler(MailSendException.class)
 	public ResponseEntity<ApiError> handleMailSendException(MailSendException e) {
+		log.error("Error enviando correo SMTP", e);
 		ApiError apiError = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now(),
 				"No se pudo enviar el correo. Inténtalo más tarde.");
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(apiError);
@@ -141,6 +147,7 @@ public class GlobalControllerError {
 
 	@ExceptionHandler(MailParseException.class)
 	public ResponseEntity<ApiError> handleMailParseException(MailParseException e) {
+		log.error("Error construyendo correo", e);
 		ApiError apiError = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now(),
 				"Error al construir el contenido del correo.");
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(apiError);

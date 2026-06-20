@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.jacaranda.manuel.VotaVision.dto.ApiResponse;
 import com.jacaranda.manuel.VotaVision.dto.PasswordResetRequest;
@@ -99,6 +100,7 @@ public class AuthenticationController {
 	}
 
 	@PostMapping("/signup")
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseEntity<?> signUpUser(@RequestBody CreateUserDto newUser) throws Exception {
 		try {
 

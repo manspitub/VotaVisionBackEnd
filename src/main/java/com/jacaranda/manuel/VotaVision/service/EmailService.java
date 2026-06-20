@@ -21,6 +21,9 @@ public class EmailService {
 	@Value("${app.frontend-base-url}")
 	private String frontendBaseUrl;
 
+	@Value("${spring.mail.username}")
+	private String mailFrom;
+
 	public void sendConfirmationEmail(String to, String name, String surname, String token, boolean isAdmin,
 			String rawPassword) throws MessagingException {
 		String subject = isAdmin ? "🛠 Has sido registrado como Creador en Votavision"
@@ -56,6 +59,7 @@ public class EmailService {
 		MimeMessage message = mailSender.createMimeMessage();
 		MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
+		helper.setFrom(mailFrom);
 		helper.setTo(to);
 		helper.setSubject(subject);
 		helper.setText(content.toString(), true); // true para HTML
@@ -84,6 +88,7 @@ public class EmailService {
 		MimeMessage message = mailSender.createMimeMessage();
 		MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
+		helper.setFrom(mailFrom);
 		helper.setTo(to);
 		helper.setSubject(subject);
 		helper.setText(content, true); // `true` para contenido HTML
@@ -107,6 +112,7 @@ public class EmailService {
 		MimeMessage message = mailSender.createMimeMessage();
 		MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
+		helper.setFrom(mailFrom);
 		helper.setTo(to);
 		helper.setSubject(subject);
 		helper.setText(content, true); // HTML habilitado
@@ -133,6 +139,7 @@ public class EmailService {
 	    MimeMessage message = mailSender.createMimeMessage();
 	    MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
+	    helper.setFrom(mailFrom);
 	    helper.setTo(to);
 	    helper.setSubject(subject);
 	    helper.setText(content, true);
@@ -164,6 +171,7 @@ public class EmailService {
     MimeMessage message = mailSender.createMimeMessage();
     MimeMessageHelper helper = new MimeMessageHelper(message, true);
 
+    helper.setFrom(mailFrom);
     helper.setTo(adminEmail); // O lista dinámica de admins
     helper.setSubject(subject);
     helper.setText(content, true);
