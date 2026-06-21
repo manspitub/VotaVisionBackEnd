@@ -180,6 +180,26 @@ public class EmailService {
     sendEmail(adminEmail, subject, content);
 }
 
+	public void sendReportActionRevokedEmail(String to, String creatorName, String surveyTitle, String action,
+			String reason, String adminName, String adminEmail) {
+		String subject = "Acción de moderación revocada - VotaVision";
+
+		String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; "
+				+ "border: 1px solid #ddd; border-radius: 10px; background-color: #f8fbff; text-align: center;'>"
+				+ "<h2 style='color: #2563eb;'>Acción de moderación revocada</h2>"
+				+ "<p style='font-size: 16px; color: #555;'>Hola <strong>" + creatorName + "</strong>,</p>"
+				+ "<p style='font-size: 16px; color: #555;'>Un administrador ha revocado la acción <strong>" + action
+				+ "</strong> asociada a tu encuesta <strong>\"" + surveyTitle + "\"</strong>.</p>"
+				+ "<p style='font-size: 16px; color: #334155;'><strong>Motivo:</strong> " + reason + "</p>"
+				+ "<p style='font-size: 16px; color: #555;'><strong>Administrador responsable:</strong><br>"
+				+ adminName + " (" + adminEmail + ")</p>"
+				+ "<hr style='margin: 20px 0;'>"
+				+ "<p style='font-size: 14px; color: #999;'>Este mensaje ha sido generado automáticamente por VotaVision.</p>"
+				+ "</div>";
+
+		sendEmail(to, subject, content);
+	}
+
 	private void sendEmail(String to, String subject, String htmlContent) {
 		Map<String, Object> payload = new HashMap<>();
 		payload.put("sender", Map.of("name", senderName, "email", senderEmail));

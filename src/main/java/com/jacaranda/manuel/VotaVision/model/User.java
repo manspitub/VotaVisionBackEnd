@@ -91,6 +91,9 @@ public class User implements UserDetails {
 	
 	@Column(name = "habilitar_notificaciones", nullable = false)
 	private boolean notificationsEnabled = true;
+	
+	@Column(name = "habilitar_recomendaciones", nullable = false)
+	private boolean recommendationsEnabled = true;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "rol", nullable = false)
@@ -118,6 +121,7 @@ public class User implements UserDetails {
 		this.subscriptions = new ArrayList<Subscription>();
 		this.notifications = new ArrayList<Notification>();
 		this.notificationsEnabled = true;
+		this.recommendationsEnabled = true;
 	}
 
 	// Getters y Setters
@@ -270,6 +274,14 @@ public class User implements UserDetails {
 
 	public void setNotificationsEnabled(boolean notificationsEnabled) {
 		this.notificationsEnabled = notificationsEnabled;
+	}
+
+	public boolean isRecommendationsEnabled() {
+		return recommendationsEnabled;
+	}
+
+	public void setRecommendationsEnabled(boolean recommendationsEnabled) {
+		this.recommendationsEnabled = recommendationsEnabled;
 	}
 	
 	

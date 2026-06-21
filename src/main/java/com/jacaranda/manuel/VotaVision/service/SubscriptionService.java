@@ -110,13 +110,19 @@ public class SubscriptionService {
 
 		UserPreferencesDto dto = new UserPreferencesDto();
 		dto.setNotificationsEnabled(user.isNotificationsEnabled());
+		dto.setRecommendationsEnabled(user.isRecommendationsEnabled());
 		return dto;
 	}
 
 	public void updateUserPreferences(String email, UserPreferencesDto preferences) {
 		User user = userRepository.findFirstByEmail(email)
 				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
-		user.setNotificationsEnabled(preferences.isNotificationsEnabled());
+		if (preferences.isNotificationsEnabled() != null) {
+			user.setNotificationsEnabled(preferences.isNotificationsEnabled());
+		}
+		if (preferences.isRecommendationsEnabled() != null) {
+			user.setRecommendationsEnabled(preferences.isRecommendationsEnabled());
+		}
 		userRepository.save(user);
 	}
 

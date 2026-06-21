@@ -71,6 +71,16 @@ public class Survey {
 	@OneToMany(mappedBy = "survey", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Notification> notifications;
 
+	@Column(name = "eliminada_moderacion")
+	private Boolean moderationDeleted = false;
+
+	@Temporal(TemporalType.TIMESTAMP)
+	@Column(name = "fecha_eliminacion_moderacion")
+	private Date moderationDeletedAt;
+
+	@Column(name = "motivo_eliminacion_moderacion", length = 1000)
+	private String moderationDeletionReason;
+
 
 
 	// Constructor por defecto: se asigna la fecha de creación automáticamente
@@ -171,6 +181,30 @@ public class Survey {
 
 	public void setNotifications(List<Notification> notifications) {
 		this.notifications = notifications;
+	}
+
+	public boolean isModerationDeleted() {
+		return Boolean.TRUE.equals(moderationDeleted);
+	}
+
+	public void setModerationDeleted(Boolean moderationDeleted) {
+		this.moderationDeleted = moderationDeleted;
+	}
+
+	public Date getModerationDeletedAt() {
+		return moderationDeletedAt;
+	}
+
+	public void setModerationDeletedAt(Date moderationDeletedAt) {
+		this.moderationDeletedAt = moderationDeletedAt;
+	}
+
+	public String getModerationDeletionReason() {
+		return moderationDeletionReason;
+	}
+
+	public void setModerationDeletionReason(String moderationDeletionReason) {
+		this.moderationDeletionReason = moderationDeletionReason;
 	}
 	
 	

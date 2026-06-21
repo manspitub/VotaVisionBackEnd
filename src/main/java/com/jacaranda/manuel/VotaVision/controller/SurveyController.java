@@ -1,5 +1,7 @@
 package com.jacaranda.manuel.VotaVision.controller;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -23,6 +25,8 @@ import com.jacaranda.manuel.VotaVision.dto.DeleteSurveyRequestDto;
 import com.jacaranda.manuel.VotaVision.dto.ReportRequest;
 import com.jacaranda.manuel.VotaVision.dto.SubmitSurveyDto;
 import com.jacaranda.manuel.VotaVision.dto.SurveyDto;
+import com.jacaranda.manuel.VotaVision.dto.SurveyResultsDto;
+import com.jacaranda.manuel.VotaVision.service.SurveyReportService;
 import com.jacaranda.manuel.VotaVision.service.SurveyService;
 
 @RestController
@@ -31,6 +35,9 @@ public class SurveyController {
 
 	@Autowired
 	private SurveyService surveyService;
+
+	@Autowired
+	private SurveyReportService surveyReportService;
 
 	@PostMapping
 	public ResponseEntity<?> createSurvey(@RequestBody CreateSurveyDto createSurveyDto) throws Exception {
@@ -93,6 +100,13 @@ public class SurveyController {
 		Page<SurveyDto> allSurveys = surveyService.getAllSurveysForAdmin(email, page, size, sort, search);
 		return ResponseEntity.ok(allSurveys);
 	}
+
+	@GetMapping("/recommended")
+	public ResponseEntity<List<SurveyDto>> getRecommendedSurveys(@RequestParam(defaultValue = "3") int limit)
+			throws Exception {
+		String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		return ResponseEntity.ok(surveyService.getRecommendedSurveys(email, limit));
+	}
 	
 	@GetMapping("/{id}/answered")
 	public ResponseEntity<AnsweredSurveyDto> getSurveyAnswered(@PathVariable Long id) throws Exception {
@@ -114,6 +128,12 @@ public class SurveyController {
 		} catch (Exception e) {
 			throw e;
 		}
+	}
+
+	@GetMapping("/{id}/results")
+	public ResponseEntity<SurveyResultsDto> getSurveyResults(@PathVariable Long id) throws Exception {
+		String currentUserEmail = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		return ResponseEntity.ok(surveyService.getSurveyResults(id, currentUserEmail));
 	}
 
 	@PutMapping("/{id}")
@@ -180,8 +200,8 @@ public class SurveyController {
 
 		try {
 			String reporterEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-			surveyService.reportSurvey(request, reporterEmail);
-			return ResponseEntity.ok(new ApiResponse("Reporte enviado a los administradores", HttpStatus.OK.value()));
+			surveyReportService.createReport(request.getSurveyId(), request.getReason(), reporterEmail);
+			return ResponseEntity.ok(new ApiResponse("Reporte registrado y enviado a los administradores", HttpStatus.OK.value()));
 		} catch (Exception e) {
 			throw e;
 		}
