@@ -12,22 +12,40 @@ import com.jacaranda.manuel.VotaVision.model.Survey;
 public interface SurveyRepository extends JpaRepository<Survey, Long> {
 
 	// Encuestas activas (sin paginar)
-	List<Survey> findByStartDateBeforeAndCloseDateAfter(Date now1, Date now2);
+	@Query("SELECT s FROM Survey s WHERE s.startDate < :now1 AND s.closeDate > :now2 "
+			+ "AND (s.moderationDeleted = false OR s.moderationDeleted IS NULL)")
+	List<Survey> findVisibleActive(@Param("now1") Date now1, @Param("now2") Date now2);
 	
 	// 🔥 Encuestas para administración filtradas por título
-	List<Survey> findByTitleContainingIgnoreCase(String title);
+	@Query("SELECT s FROM Survey s WHERE LOWER(s.title) LIKE LOWER(CONCAT('%', :title, '%')) "
+			+ "AND (s.moderationDeleted = false OR s.moderationDeleted IS NULL)")
+	List<Survey> findVisibleByTitleContainingIgnoreCase(@Param("title") String title);
 	
 	// Encuestas activas con búsqueda por título (sin paginar)
-	List<Survey> findByTitleContainingIgnoreCaseAndStartDateBeforeAndCloseDateAfter(String title, Date now1, Date now2);
+	@Query("SELECT s FROM Survey s WHERE LOWER(s.title) LIKE LOWER(CONCAT('%', :title, '%')) "
+			+ "AND s.startDate < :now1 AND s.closeDate > :now2 "
+			+ "AND (s.moderationDeleted = false OR s.moderationDeleted IS NULL)")
+	List<Survey> findVisibleActiveByTitleContainingIgnoreCase(@Param("title") String title,
+			@Param("now1") Date now1, @Param("now2") Date now2);
 
 	// Encuestas por creador (sin paginar)
-	List<Survey> findByCreatorEmail(String creatorEmail);
+	@Query("SELECT s FROM Survey s WHERE s.creator.email = :creatorEmail "
+			+ "AND (s.moderationDeleted = false OR s.moderationDeleted IS NULL)")
+	List<Survey> findVisibleByCreatorEmail(@Param("creatorEmail") String creatorEmail);
 
 	// Encuestas por creador con búsqueda por título (sin paginar)
-	List<Survey> findByCreatorEmailAndTitleContainingIgnoreCase(String creatorEmail, String title);
+	@Query("SELECT s FROM Survey s WHERE s.creator.email = :creatorEmail "
+			+ "AND LOWER(s.title) LIKE LOWER(CONCAT('%', :title, '%')) "
+			+ "AND (s.moderationDeleted = false OR s.moderationDeleted IS NULL)")
+	List<Survey> findVisibleByCreatorEmailAndTitleContainingIgnoreCase(@Param("creatorEmail") String creatorEmail,
+			@Param("title") String title);
 	
-	@Query("SELECT DISTINCT s FROM Survey s JOIN s.participations p WHERE p.user.email = :email")
-	List<Survey> findDistinctByParticipationsUserEmail(@Param("email") String email);
+	@Query("SELECT DISTINCT s FROM Survey s JOIN s.participations p WHERE p.user.email = :email "
+			+ "AND (s.moderationDeleted = false OR s.moderationDeleted IS NULL)")
+	List<Survey> findVisibleDistinctByParticipationsUserEmail(@Param("email") String email);
+
+	@Query("SELECT s FROM Survey s WHERE (s.moderationDeleted = false OR s.moderationDeleted IS NULL)")
+	List<Survey> findAllVisible();
 
 	
 }

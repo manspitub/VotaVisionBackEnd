@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.jacaranda.manuel.VotaVision.dto.AnsweredQuestionDto;
 import com.jacaranda.manuel.VotaVision.dto.AnsweredSurveyDto;
@@ -25,6 +26,9 @@ import com.jacaranda.manuel.VotaVision.dto.SubmitAnswerDto;
 import com.jacaranda.manuel.VotaVision.dto.SubmitSurveyDto;
 import com.jacaranda.manuel.VotaVision.dto.SurveyDto;
 import com.jacaranda.manuel.VotaVision.dto.SurveyDtoConverter;
+import com.jacaranda.manuel.VotaVision.dto.SurveyResultsDto;
+import com.jacaranda.manuel.VotaVision.dto.SurveyResultsDto.OptionResultsDto;
+import com.jacaranda.manuel.VotaVision.dto.SurveyResultsDto.QuestionResultsDto;
 import com.jacaranda.manuel.VotaVision.exception.SurveyMalformedException;
 import com.jacaranda.manuel.VotaVision.exception.UnauthorizedException;
 import com.jacaranda.manuel.VotaVision.exception.UserNotFoundException;
@@ -158,6 +162,8 @@ public class SurveyService {
 	public Page<SurveyDto> getActiveSurveysPaged(String userEmail, int pageNum, int pageSize, String orden,
 			String searchTerm) {
 		Date now = new Date();
+		User user = userRepository.findFirstByEmail(userEmail)
+				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
 
 		List<String> validOrders = List.of("id-Asc", "startDate-Asc", "startDate-Des", "closeDate-Asc", "closeDate-Des",
 				"reward-Asc", "reward-Des", "responses-Asc", "responses-Des");
@@ -172,34 +178,32 @@ public class SurveyService {
 
 		List<Survey> all;
 		if (searchTerm == null || searchTerm.isBlank()) {
-			all = surveyRepository.findByStartDateBeforeAndCloseDateAfter(now, now);
+			all = surveyRepository.findVisibleActive(now, now);
 		} else {
-			all = surveyRepository.findByTitleContainingIgnoreCaseAndStartDateBeforeAndCloseDateAfter(searchTerm.trim(),
-					now, now);
+			all = surveyRepository.findVisibleActiveByTitleContainingIgnoreCase(searchTerm.trim(), now, now);
 		}
 
 		List<SurveyDto> dtos = all.stream()
 				.map((Function<Survey, SurveyDto>) survey -> converter.convertSurveyDto(survey, userEmail))
 				.collect(Collectors.toList());
 
+		Comparator<SurveyDto> selectedComparator = buildSurveyDtoComparator(campo, direccion);
+
 		// Orden manual si es por respuestas
-		if (campo.equals("responses")) {
-			dtos.sort((a, b) -> {
-				int cmp = Integer.compare(a.getResponsesCount(), b.getResponsesCount());
-				return direccion.equalsIgnoreCase("Asc") ? cmp : -cmp;
+		if (user.getRole() == Rol.USER) {
+			List<Long> subscribedCategoryIds = subscriptionRepository.findByUser(user).stream()
+					.map(subscription -> subscription.getCategory().getId()).collect(Collectors.toList());
+
+			dtos.sort((left, right) -> {
+				int byRecommendationGroup = Integer.compare(getActiveSurveyGroup(left, subscribedCategoryIds),
+						getActiveSurveyGroup(right, subscribedCategoryIds));
+				if (byRecommendationGroup != 0) {
+					return byRecommendationGroup;
+				}
+				return selectedComparator.compare(left, right);
 			});
 		} else {
-			Comparator<SurveyDto> comparator = switch (campo) {
-			case "startDate" -> Comparator.comparing(SurveyDto::getStartDate);
-			case "closeDate" -> Comparator.comparing(SurveyDto::getCloseDate);
-			case "reward" -> Comparator.comparing(SurveyDto::getReward);
-			case "id" -> Comparator.comparing(SurveyDto::getId);
-			default -> Comparator.comparing(SurveyDto::getId);
-			};
-			if (direccion.equalsIgnoreCase("Des")) {
-				comparator = comparator.reversed();
-			}
-			dtos.sort(comparator);
+			dtos.sort(selectedComparator);
 		}
 
 		// Paginación manual
@@ -232,8 +236,8 @@ public class SurveyService {
 		String direccion = ordenSplit[1];
 
 		// ⚠️ Recuperamos TODAS las encuestas del creador (sin paginar)
-		List<Survey> all = (search == null || search.isBlank()) ? surveyRepository.findByCreatorEmail(creatorEmail)
-				: surveyRepository.findByCreatorEmailAndTitleContainingIgnoreCase(creatorEmail, search);
+		List<Survey> all = (search == null || search.isBlank()) ? surveyRepository.findVisibleByCreatorEmail(creatorEmail)
+				: surveyRepository.findVisibleByCreatorEmailAndTitleContainingIgnoreCase(creatorEmail, search);
 
 		List<SurveyDto> dtos = all.stream()
 				.map((Function<Survey, SurveyDto>) survey -> converter.convertSurveyDto(survey, creatorEmail))
@@ -284,7 +288,7 @@ public class SurveyService {
 		String direccion = ordenSplit[1];
 
 		// Encuestas respondidas por el usuario
-		List<Survey> surveys = surveyRepository.findDistinctByParticipationsUserEmail(userEmail);
+		List<Survey> surveys = surveyRepository.findVisibleDistinctByParticipationsUserEmail(userEmail);
 
 		// Filtrado por título si se busca algo
 		if (search != null && !search.isBlank()) {
@@ -344,8 +348,8 @@ public class SurveyService {
 		String direccion = ordenSplit[1];
 
 		// Obtener todas las encuestas (con o sin filtro)
-		List<Survey> all = (searchTerm == null || searchTerm.isBlank()) ? surveyRepository.findAll()
-				: surveyRepository.findByTitleContainingIgnoreCase(searchTerm.trim());
+		List<Survey> all = (searchTerm == null || searchTerm.isBlank()) ? surveyRepository.findAllVisible()
+				: surveyRepository.findVisibleByTitleContainingIgnoreCase(searchTerm.trim());
 
 		List<SurveyDto> dtos = all.stream().map(survey -> converter.convertSurveyDto(survey, adminEmail)) // sin pasar
 																											// email,
@@ -385,17 +389,73 @@ public class SurveyService {
 		Survey survey = surveyRepository.findById(id)
 				.orElseThrow(() -> new SurveyMalformedException("Encuesta no encontrada"));
 
-		// Validar si pertenece al usuario
-//		if (!survey.getCreator().getEmail().equals(userEmail)) {
-//			throw new UnauthorizedException("No tienes permisos para ver esta encuesta.");
-//		}
+		User user = userRepository.findFirstByEmail(userEmail)
+				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+		if (survey.isModerationDeleted() && user.getRole() != Rol.ADMIN) {
+			throw new UnauthorizedException("Esta encuesta ha sido retirada por moderación.");
+		}
 
 		return converter.convertSurveyDto(survey, userEmail);
+	}
+
+	@Transactional(readOnly = true)
+	public SurveyResultsDto getSurveyResults(Long surveyId, String userEmail) {
+		Survey survey = surveyRepository.findById(surveyId)
+				.orElseThrow(() -> new SurveyMalformedException("Encuesta no encontrada"));
+
+		User currentUser = userRepository.findFirstByEmail(userEmail)
+				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+		boolean isAdmin = currentUser.getRole() == Rol.ADMIN;
+		boolean isOwner = currentUser.getRole() == Rol.CREATOR && survey.getCreator().getEmail().equals(userEmail);
+		if (!isAdmin && !isOwner) {
+			throw new UnauthorizedException("No tienes permisos para ver los resultados de esta encuesta.");
+		}
+
+		int totalResponses = survey.getParticipations() == null ? 0 : survey.getParticipations().size();
+		long totalUsers = userRepository.countByRole(Rol.USER);
+
+		SurveyResultsDto results = new SurveyResultsDto();
+		results.setSurveyId(survey.getId());
+		results.setTitle(survey.getTitle());
+		results.setStatus(resolveSurveyStatus(survey));
+		results.setTotalResponses(totalResponses);
+		results.setParticipationRate(totalUsers == 0 ? 0 : roundPercentage((totalResponses * 100.0) / totalUsers));
+		results.setQuestions(survey.getQuestions().stream().map(this::buildQuestionResults).collect(Collectors.toList()));
+
+		return results;
+	}
+
+	@Transactional(readOnly = true)
+	public List<SurveyDto> getRecommendedSurveys(String userEmail, int limit) {
+		User user = userRepository.findFirstByEmail(userEmail)
+				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+		if (user.getRole() != Rol.USER) {
+			throw new UnauthorizedException("Solo los usuarios pueden recibir recomendaciones de encuestas.");
+		}
+
+		if (!user.isRecommendationsEnabled()) {
+			return List.of();
+		}
+
+		int safeLimit = Math.max(1, Math.min(limit, 12));
+		Date now = new Date();
+		List<Long> subscribedCategoryIds = subscriptionRepository.findByUser(user).stream()
+				.map(subscription -> subscription.getCategory().getId()).collect(Collectors.toList());
+
+		return surveyRepository.findVisibleActive(now, now).stream()
+				.filter(survey -> !participationRepository.existsBySurveyIdAndUserEmail(survey.getId(), userEmail))
+				.sorted((left, right) -> compareRecommendedSurveys(left, right, subscribedCategoryIds)).limit(safeLimit)
+				.map(survey -> converter.convertSurveyDto(survey, userEmail)).collect(Collectors.toList());
 	}
 
 	public AnsweredSurveyDto getSurveyWithAnswers(Long surveyId, String userEmail) throws Exception {
 		Survey survey = surveyRepository.findById(surveyId)
 				.orElseThrow(() -> new SurveyMalformedException("Encuesta no encontrada"));
+		if (survey.isModerationDeleted()) {
+			throw new SurveyMalformedException("Esta encuesta ha sido retirada por moderación.");
+		}
 
 		SurveyDto baseDto = converter.convertSurveyDto(survey, userEmail);
 
@@ -595,6 +655,9 @@ public class SurveyService {
 
 		Survey survey = surveyRepository.findById(dto.getSurveyId())
 				.orElseThrow(() -> new SurveyMalformedException("Encuesta no encontrada"));
+		if (survey.isModerationDeleted()) {
+			throw new SurveyMalformedException("Esta encuesta ha sido retirada por moderación.");
+		}
 
 		// Comprobar si ya respondió
 		Optional<Participation> existing = survey.getParticipations().stream()
@@ -740,6 +803,107 @@ public class SurveyService {
 				&& (qDto.getOptions() == null || qDto.getOptions().isEmpty())) {
 			throw new SurveyMalformedException("La pregunta de tipo MULTIPLE_CHOICE debe tener opciones.");
 		}
+	}
+
+	private QuestionResultsDto buildQuestionResults(Question question) {
+		QuestionResultsDto dto = new QuestionResultsDto();
+		dto.setQuestionId(question.getId());
+		dto.setText(question.getText());
+		dto.setType(question.getType().name());
+
+		List<Answer> answers = question.getAnswers() == null ? Collections.emptyList() : question.getAnswers();
+		if (question.getType() == QuestionType.MULTIPLE_CHOICE) {
+			long totalSelections = answers.stream().filter(answer -> answer.getAnswerOptions() != null)
+					.flatMap(answer -> answer.getAnswerOptions().stream()).count();
+
+			List<OptionResultsDto> optionResults = question.getOptions().stream().map(option -> {
+				long count = countOptionSelections(answers, option);
+				OptionResultsDto optionDto = new OptionResultsDto();
+				optionDto.setOptionId(option.getId());
+				optionDto.setText(option.getText());
+				optionDto.setCount(count);
+				optionDto.setPercentage(totalSelections == 0 ? 0 : roundPercentage((count * 100.0) / totalSelections));
+				return optionDto;
+			}).collect(Collectors.toList());
+
+			dto.setOptions(optionResults);
+		} else {
+			List<String> openAnswers = answers.stream().map(Answer::getText).filter(text -> text != null)
+					.map(String::trim).filter(text -> !text.isEmpty()).collect(Collectors.toList());
+			dto.setAnswers(openAnswers);
+		}
+
+		return dto;
+	}
+
+	private long countOptionSelections(List<Answer> answers, Option option) {
+		return answers.stream().filter(answer -> answer.getAnswerOptions() != null)
+				.flatMap(answer -> answer.getAnswerOptions().stream())
+				.filter(answerOption -> answerOption.getOption().getId().equals(option.getId())).count();
+	}
+
+	private int compareRecommendedSurveys(Survey left, Survey right, List<Long> subscribedCategoryIds) {
+		boolean leftSubscribed = isSubscribedCategory(left, subscribedCategoryIds);
+		boolean rightSubscribed = isSubscribedCategory(right, subscribedCategoryIds);
+		int bySubscription = Boolean.compare(!leftSubscribed, !rightSubscribed);
+		if (bySubscription != 0) {
+			return bySubscription;
+		}
+
+		int byCloseDate = left.getCloseDate().compareTo(right.getCloseDate());
+		if (byCloseDate != 0) {
+			return byCloseDate;
+		}
+
+		double leftReward = left.getReward() == null ? 0 : left.getReward();
+		double rightReward = right.getReward() == null ? 0 : right.getReward();
+		return Double.compare(rightReward, leftReward);
+	}
+
+	private Comparator<SurveyDto> buildSurveyDtoComparator(String campo, String direccion) {
+		Comparator<SurveyDto> comparator;
+		if (campo.equals("responses")) {
+			comparator = Comparator.comparingInt(SurveyDto::getResponsesCount);
+		} else {
+			comparator = switch (campo) {
+			case "startDate" -> Comparator.comparing(SurveyDto::getStartDate);
+			case "closeDate" -> Comparator.comparing(SurveyDto::getCloseDate);
+			case "reward" -> Comparator.comparing(SurveyDto::getReward);
+			case "id" -> Comparator.comparing(SurveyDto::getId);
+			default -> Comparator.comparing(SurveyDto::getId);
+			};
+		}
+
+		return direccion.equalsIgnoreCase("Des") ? comparator.reversed() : comparator;
+	}
+
+	private int getActiveSurveyGroup(SurveyDto survey, List<Long> subscribedCategoryIds) {
+		if (!survey.isCanRespond()) {
+			return 3;
+		}
+		if (survey.getCategory() != null && subscribedCategoryIds.contains(survey.getCategory().getId())) {
+			return 1;
+		}
+		return 2;
+	}
+
+	private boolean isSubscribedCategory(Survey survey, List<Long> subscribedCategoryIds) {
+		return survey.getCategory() != null && subscribedCategoryIds.contains(survey.getCategory().getId());
+	}
+
+	private String resolveSurveyStatus(Survey survey) {
+		Date now = new Date();
+		if (survey.getStartDate().after(now)) {
+			return "SCHEDULED";
+		}
+		if (survey.getCloseDate().before(now)) {
+			return "CLOSED";
+		}
+		return "ACTIVE";
+	}
+
+	private double roundPercentage(double value) {
+		return Math.round(value * 100.0) / 100.0;
 	}
 
 }
