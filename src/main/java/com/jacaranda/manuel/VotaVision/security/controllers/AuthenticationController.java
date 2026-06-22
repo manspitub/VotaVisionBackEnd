@@ -36,6 +36,7 @@ import com.jacaranda.manuel.VotaVision.security.dto.PasswordRecoveryRequest;
 import com.jacaranda.manuel.VotaVision.security.jwt.JwtProvider;
 import com.jacaranda.manuel.VotaVision.security.jwt.JwtUserResponse;
 import com.jacaranda.manuel.VotaVision.service.EmailService;
+import com.jacaranda.manuel.VotaVision.service.SurveyService;
 import com.jacaranda.manuel.VotaVision.service.UserService;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,6 +56,8 @@ public class AuthenticationController {
 	private UserService userService;
 	@Autowired
 	private EmailService emailService;
+	@Autowired
+	private SurveyService surveyService;
 	@Autowired
 	private UserDtoConverter userDtoConverter;
 
@@ -221,6 +224,16 @@ public class AuthenticationController {
 			String emailCurrentUser = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 			User user = userService.findUserByEmail(emailCurrentUser);
 			return ResponseEntity.ok(userDtoConverter.convertUserDto(user));
+		} catch (Exception e) {
+			throw e;
+		}
+	}
+
+	@GetMapping("/users/me/activity-summary")
+	public ResponseEntity<?> getMyActivitySummary() throws Exception {
+		try {
+			String emailCurrentUser = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+			return ResponseEntity.ok(surveyService.getUserActivitySummary(emailCurrentUser));
 		} catch (Exception e) {
 			throw e;
 		}
