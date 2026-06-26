@@ -23,12 +23,14 @@ import com.jacaranda.manuel.VotaVision.dto.CreateQuestionDto;
 import com.jacaranda.manuel.VotaVision.dto.CreateSurveyDto;
 import com.jacaranda.manuel.VotaVision.dto.ReportRequest;
 import com.jacaranda.manuel.VotaVision.dto.SubmitAnswerDto;
+import com.jacaranda.manuel.VotaVision.dto.SubmitSurveyResponseDto;
 import com.jacaranda.manuel.VotaVision.dto.SubmitSurveyDto;
 import com.jacaranda.manuel.VotaVision.dto.SurveyDto;
 import com.jacaranda.manuel.VotaVision.dto.SurveyDtoConverter;
 import com.jacaranda.manuel.VotaVision.dto.SurveyResultsDto;
 import com.jacaranda.manuel.VotaVision.dto.SurveyResultsDto.OptionResultsDto;
 import com.jacaranda.manuel.VotaVision.dto.SurveyResultsDto.QuestionResultsDto;
+import com.jacaranda.manuel.VotaVision.dto.UserActivitySummaryDto;
 import com.jacaranda.manuel.VotaVision.exception.SurveyMalformedException;
 import com.jacaranda.manuel.VotaVision.exception.UnauthorizedException;
 import com.jacaranda.manuel.VotaVision.exception.UserNotFoundException;
@@ -161,6 +163,13 @@ public class SurveyService {
 
 	public Page<SurveyDto> getActiveSurveysPaged(String userEmail, int pageNum, int pageSize, String orden,
 			String searchTerm) {
+		return getActiveSurveysPaged(userEmail, pageNum, pageSize, orden, searchTerm, null, false, false, null, null,
+				false);
+	}
+
+	public Page<SurveyDto> getActiveSurveysPaged(String userEmail, int pageNum, int pageSize, String orden,
+			String searchTerm, Long categoryId, boolean recommendedOnly, boolean closingSoon, Double minReward,
+			Double maxReward, boolean unansweredOnly) {
 		Date now = new Date();
 		User user = userRepository.findFirstByEmail(userEmail)
 				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
@@ -187,13 +196,43 @@ public class SurveyService {
 				.map((Function<Survey, SurveyDto>) survey -> converter.convertSurveyDto(survey, userEmail))
 				.collect(Collectors.toList());
 
+		List<Long> subscribedCategoryIds = user.getRole() == Rol.USER
+				? subscriptionRepository.findByUser(user).stream().map(subscription -> subscription.getCategory().getId())
+						.collect(Collectors.toList())
+				: List.of();
+
+		if (categoryId != null) {
+			dtos = dtos.stream().filter(survey -> survey.getCategory() != null
+					&& survey.getCategory().getId().equals(categoryId)).collect(Collectors.toList());
+		}
+
+		if (recommendedOnly && user.getRole() == Rol.USER) {
+			dtos = dtos.stream().filter(survey -> survey.getCategory() != null
+					&& subscribedCategoryIds.contains(survey.getCategory().getId())).collect(Collectors.toList());
+		}
+
+		if (closingSoon) {
+			dtos = dtos.stream().filter(survey -> isClosingSoon(survey.getCloseDate(), now)).collect(Collectors.toList());
+		}
+
+		if (minReward != null) {
+			dtos = dtos.stream().filter(survey -> survey.getReward() != null && survey.getReward() >= minReward)
+					.collect(Collectors.toList());
+		}
+
+		if (maxReward != null) {
+			dtos = dtos.stream().filter(survey -> survey.getReward() != null && survey.getReward() <= maxReward)
+					.collect(Collectors.toList());
+		}
+
+		if (unansweredOnly) {
+			dtos = dtos.stream().filter(SurveyDto::isCanRespond).collect(Collectors.toList());
+		}
+
 		Comparator<SurveyDto> selectedComparator = buildSurveyDtoComparator(campo, direccion);
 
 		// Orden manual si es por respuestas
 		if (user.getRole() == Rol.USER) {
-			List<Long> subscribedCategoryIds = subscriptionRepository.findByUser(user).stream()
-					.map(subscription -> subscription.getCategory().getId()).collect(Collectors.toList());
-
 			dtos.sort((left, right) -> {
 				int byRecommendationGroup = Integer.compare(getActiveSurveyGroup(left, subscribedCategoryIds),
 						getActiveSurveyGroup(right, subscribedCategoryIds));
@@ -450,6 +489,27 @@ public class SurveyService {
 				.map(survey -> converter.convertSurveyDto(survey, userEmail)).collect(Collectors.toList());
 	}
 
+	@Transactional(readOnly = true)
+	public UserActivitySummaryDto getUserActivitySummary(String userEmail) {
+		User user = userRepository.findFirstByEmail(userEmail)
+				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+		if (user.getRole() != Rol.USER) {
+			throw new UnauthorizedException("Solo los usuarios pueden consultar su resumen de actividad.");
+		}
+
+		Date now = new Date();
+		int answeredSurveys = participationRepository.findAllByUserEmail(userEmail).size();
+		List<SurveyDto> available = surveyRepository.findVisibleActive(now, now).stream()
+				.map(survey -> converter.convertSurveyDto(survey, userEmail)).filter(SurveyDto::isCanRespond)
+				.collect(Collectors.toList());
+		List<SurveyDto> recommended = getRecommendedSurveys(userEmail, 12);
+		SurveyDto bestRecommended = recommended.isEmpty() ? null : recommended.get(0);
+
+		return new UserActivitySummaryDto(user.getReward(), answeredSurveys, available.size(), recommended.size(),
+				bestRecommended);
+	}
+
 	public AnsweredSurveyDto getSurveyWithAnswers(Long surveyId, String userEmail) throws Exception {
 		Survey survey = surveyRepository.findById(surveyId)
 				.orElseThrow(() -> new SurveyMalformedException("Encuesta no encontrada"));
@@ -649,7 +709,7 @@ public class SurveyService {
 		return dto;
 	}
 
-	public void submitSurvey(SubmitSurveyDto dto, String userEmail) throws Exception {
+	public SubmitSurveyResponseDto submitSurvey(SubmitSurveyDto dto, String userEmail) throws Exception {
 		User user = userRepository.findFirstByEmail(userEmail)
 				.orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
 
@@ -685,7 +745,11 @@ public class SurveyService {
 			answer.setParticipation(participation);
 
 			if (question.getType() == QuestionType.MULTIPLE_CHOICE) {
-				List<AnswerOption> answerOptions = answerDto.getOptionIds().stream().map(optionId -> {
+				List<Long> selectedOptionIds = answerDto.getOptionIds() == null ? List.of() : answerDto.getOptionIds();
+				if (question.getIsMandatory() && selectedOptionIds.isEmpty()) {
+					throw new SurveyMalformedException("Falta seleccionar una opción. En: " + answerDto.getQuestionId());
+				}
+				List<AnswerOption> answerOptions = selectedOptionIds.stream().map(optionId -> {
 					Option opt = question.getOptions().stream().filter(o -> o.getId().equals(optionId)).findFirst()
 							.orElseThrow(() -> new SurveyMalformedException("Opción inválida"));
 					return new AnswerOption(answer, opt);
@@ -715,10 +779,15 @@ public class SurveyService {
 
 		// Añadir participación (se guarda en cascada)
 		survey.getParticipations().add(participation);
-		user.setReward(user.getReward().add(BigDecimal.valueOf(survey.getReward())));
+		Double rewardAdded = survey.getReward() == null ? 0 : survey.getReward();
+		user.setReward(user.getReward().add(BigDecimal.valueOf(rewardAdded)));
 
 		surveyRepository.save(survey);
 		userRepository.save(user);
+
+		SurveyDto nextRecommendedSurvey = getRecommendedSurveys(userEmail, 1).stream().findFirst().orElse(null);
+		return new SubmitSurveyResponseDto("Encuesta enviada correctamente", rewardAdded, user.getReward(),
+				participation.getDate(), nextRecommendedSurvey);
 	}
 
 	public void reportSurvey(ReportRequest request, String reporterEmail) throws MessagingException {
@@ -840,6 +909,15 @@ public class SurveyService {
 		return answers.stream().filter(answer -> answer.getAnswerOptions() != null)
 				.flatMap(answer -> answer.getAnswerOptions().stream())
 				.filter(answerOption -> answerOption.getOption().getId().equals(option.getId())).count();
+	}
+
+	private boolean isClosingSoon(Date closeDate, Date now) {
+		if (closeDate == null || closeDate.before(now)) {
+			return false;
+		}
+
+		long threeDaysInMillis = 3L * 24L * 60L * 60L * 1000L;
+		return closeDate.getTime() - now.getTime() <= threeDaysInMillis;
 	}
 
 	private int compareRecommendedSurveys(Survey left, Survey right, List<Long> subscribedCategoryIds) {

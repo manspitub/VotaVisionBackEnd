@@ -53,10 +53,17 @@ public class SurveyController {
 	@GetMapping("/active")
 	public ResponseEntity<?> getActiveSurveys(@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "10") int size, @RequestParam(defaultValue = "id-Asc") String sort,
-			@RequestParam(defaultValue = "") String search) {
+			@RequestParam(defaultValue = "") String search,
+			@RequestParam(required = false) Long categoryId,
+			@RequestParam(defaultValue = "false") boolean recommendedOnly,
+			@RequestParam(defaultValue = "false") boolean closingSoon,
+			@RequestParam(required = false) Double minReward,
+			@RequestParam(required = false) Double maxReward,
+			@RequestParam(defaultValue = "false") boolean unansweredOnly) {
 		try {
 			String currentUserEmail = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-			Page<SurveyDto> surveys = surveyService.getActiveSurveysPaged(currentUserEmail, page, size, sort, search);
+			Page<SurveyDto> surveys = surveyService.getActiveSurveysPaged(currentUserEmail, page, size, sort, search,
+					categoryId, recommendedOnly, closingSoon, minReward, maxReward, unansweredOnly);
 
 			return ResponseEntity.ok(surveys);
 		} catch (Exception e) {
@@ -187,8 +194,7 @@ public class SurveyController {
 	public ResponseEntity<?> submitSurvey(@RequestBody SubmitSurveyDto dto) throws Exception {
 		try {
 			String email = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-			surveyService.submitSurvey(dto, email);
-			return ResponseEntity.ok(new ApiResponse("Encuesta enviada correctamente", HttpStatus.OK.value()));
+			return ResponseEntity.ok(surveyService.submitSurvey(dto, email));
 		} catch (Exception e) {
 			throw e;
 		}
